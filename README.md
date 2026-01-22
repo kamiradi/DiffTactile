@@ -24,6 +24,34 @@ cd DiffTactile
 pip install -r requirements.txt -e .
 ```
 
+## Docker
+
+### Build the container
+```bash
+docker compose build
+```
+
+### Run the container
+```bash
+# Allow X11 forwarding for GUI (run once per session)
+xhost +local:docker
+
+# Start the container
+docker compose up -d
+```
+
+### Get into the container
+```bash
+docker compose exec difftactile bash
+```
+
+### Stop the container
+```bash
+docker compose down
+```
+
+**Note:** The container requires NVIDIA GPU support. Ensure you have the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed.
+
 ## File Structure
 - `meshes` includes all object and sensor mesh models.
 - `object_model` includes soft (elastic, elastoplastic), rigid, multi-material, and cable object models.
