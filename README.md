@@ -40,7 +40,7 @@ docker compose down
 
 **Note:** The container requires NVIDIA GPU support. Ensure you have the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed.
 
-## Installation
+## Installation (non docker)
 Once inside the docker container, you can create a Conda environment for this simulator:
 ```bash
 conda create -n difftactile python=3.9.16
@@ -51,6 +51,13 @@ And install the package with its dependencies using
 ```bash
 git clone https://github.com/DiffTactile/DiffTactile.git
 cd DiffTactile
+pip install -r requirements.txt -e .
+```
+
+## Installation (First docker build)
+```bash
+conda create -n difftactile python=3.9.16
+conda activate difftactile
 pip install -r requirements.txt -e .
 ```
 
