@@ -585,7 +585,7 @@ def main():
     num_total_steps = 600
     num_opt_steps = 100
     dt = 5e-5
-    contact_model = Contact(use_tactile=USE_TACTILE, USE_STATE=USE_STATE, dt=dt, total_steps = num_total_steps, sub_steps = num_sub_steps,  obj=obj_name)
+    contact_model = Contact(use_tactile=USE_TACTILE, use_state=USE_STATE, dt=dt, total_steps = num_total_steps, sub_steps = num_sub_steps,  obj=obj_name)
 
     if not off_screen:
         gui1 = ti.GUI("Contact Viz")
