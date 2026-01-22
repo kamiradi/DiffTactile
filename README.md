@@ -10,8 +10,38 @@
 This package provides a tactile simulator with differential physics for contact-rich manipulation tasks . It models soft tactile sensors, objects with various material properties, and contact between sensors and objects.
 For more information, please refer to the [project webpage](https://difftactile.github.io/) or [corresponding paper](https://openreview.net/forum?id=eJHnSg783t).
 
+## Docker (Recommended)
+
+### Build the container
+From within the project root directory, run
+```bash
+docker compose build
+```
+
+### Run the container
+Again from within the project root directory, run
+```bash
+# Allow X11 forwarding for GUI (run once per session)
+xhost +local:docker
+
+# Start the container
+docker compose up -d
+```
+
+### Get into the container
+```bash
+docker exec -it difftactile bash
+```
+
+### Stop the container
+```bash
+docker compose down
+```
+
+**Note:** The container requires NVIDIA GPU support. Ensure you have the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed.
+
 ## Installation
-You can create a Conda environment for this simulator:
+Once inside the docker container, you can create a Conda environment for this simulator:
 ```bash
 conda create -n difftactile python=3.9.16
 conda activate difftactile
@@ -24,33 +54,6 @@ cd DiffTactile
 pip install -r requirements.txt -e .
 ```
 
-## Docker
-
-### Build the container
-```bash
-docker compose build
-```
-
-### Run the container
-```bash
-# Allow X11 forwarding for GUI (run once per session)
-xhost +local:docker
-
-# Start the container
-docker compose up -d
-```
-
-### Get into the container
-```bash
-docker compose exec difftactile bash
-```
-
-### Stop the container
-```bash
-docker compose down
-```
-
-**Note:** The container requires NVIDIA GPU support. Ensure you have the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html) installed.
 
 ## File Structure
 - `meshes` includes all object and sensor mesh models.
