@@ -61,6 +61,14 @@ conda activate difftactile
 pip install -r requirements.txt -e .
 ```
 
+## Experiments
+To repoduce experiments for parameter sweep
+```bash
+# from project root
+cd difftactile/tasks
+python fem_param_identification.py +experiment=sweep_lr
+```
+
 
 ## File Structure
 - `meshes` includes all object and sensor mesh models.

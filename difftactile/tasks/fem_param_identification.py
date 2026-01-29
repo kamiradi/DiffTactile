@@ -427,8 +427,8 @@ class SensorParamEstimation:
     def set_pos_control(self, sensor: ti.template(), f: ti.i32):
         # Dummy loop required for tape autodiff compatibility
         for _ in range(1):
-            sensor.d_pos[None] = self.p_sensor[f]
-            sensor.d_ori[None] = self.o_sensor[f]
+            sensor.d_pos[None] = self.p_sensor[f] # set desired position from traj
+            sensor.d_ori[None] = self.o_sensor[f] # set desired orientation from traj
 
     @ti.func
     def calculate_contact_force(self, sdf, norm_v, relative_v):
@@ -647,21 +647,25 @@ class SensorParamEstimation:
         )
 
         # Apply current E, nu to compute mu, lam
-        self.compute_lame_params()
-        self.apply_target_params()
+        self.compute_lame_params() # -> estimate mu and lam from current E and nu
+        self.apply_target_params() # -> applies mu and lam to target sensor
 
         logger.debug(
             f"Lame params: mu={self.mu_target[None]:.4f}, lam={self.lam_target[None]:.4f}"
         )
 
-        self.init_scene(self.target_sensor)
+        # Intialize the sensor and object in the simulation
+        self.init_scene(self.target_sensor) 
 
+        # simulation for loop
         for ts in range(self.total_steps):
-            self.set_pos_control(self.target_sensor, ts)
-            self.target_sensor.set_pose_control()
-            self.target_sensor.set_control_vel(0)
-            self.target_sensor.set_vel(0)
-            self.reset_sensor(self.target_sensor)
+            self.set_pos_control(self.target_sensor, ts) # set desired pos/ori from traj
+            self.target_sensor.set_pose_control() # apply pos/ori control
+            self.target_sensor.set_control_vel(0) # set desired vel at frame=0
+            self.target_sensor.set_vel(0) # set computed vel at frame=0
+
+            # clears contact forces on sensor and target object
+            self.reset_sensor(self.target_sensor) 
 
             for ss in range(self.sub_steps - 1):
                 self.update_step(self.target_sensor, ss)
@@ -1029,8 +1033,8 @@ def run_experiment(cfg: DictConfig):
             continue
 
         # Gradient descent
-        new_E = estimator.E_target[None] + lr_E * result["grad_E"]
-        new_nu = estimator.nu_target[None] + lr_nu * result["grad_nu"]
+        new_E = estimator.E_target[None] - lr_E * result["grad_E"]
+        new_nu = estimator.nu_target[None] - lr_nu * result["grad_nu"]
 
         # Clamp to valid ranges
         new_E = max(new_E, 100.0)

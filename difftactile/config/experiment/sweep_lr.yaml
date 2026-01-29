@@ -10,7 +10,7 @@ hydra:
       optim.lr_nu: 0.0001,0.001,0.01
 
 optim:
-  num_iters: 25
+  num_iters: 200
 
 output:
   plot: true
