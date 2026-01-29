@@ -1,0 +1,17 @@
+# @package _global_
+# Learning rate sweep experiment
+defaults:
+  - override /hydra/sweeper: basic
+
+hydra:
+  sweeper:
+    params:
+      optim.lr_E: 1e4, 1e6, 1e7
+      optim.lr_nu: 0.0001,0.001,0.01
+
+optim:
+  num_iters: 25
+
+output:
+  plot: true
+  no_show: True

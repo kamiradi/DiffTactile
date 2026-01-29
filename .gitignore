@@ -9,7 +9,9 @@ __pycache__/
 *.npy
 
 model/
+outputs/
 output/
+multirun/
 assets/
 data/
 fp/

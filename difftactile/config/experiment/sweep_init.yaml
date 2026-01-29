@@ -1,0 +1,18 @@
+# @package _global_
+# Initialization sweep experiment
+defaults:
+  - override /hydra/sweeper: basic
+
+hydra:
+  sweeper:
+    params:
+      params.E_init: 4000,8000,12000,16000,20000
+      params.nu_init: 0.1,0.2,0.3,0.4
+
+optim:
+  num_iters: 50
+  lr_E: 1000
+
+output:
+  plot: true
+  no_show: true

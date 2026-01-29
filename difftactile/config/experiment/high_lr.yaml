@@ -1,0 +1,11 @@
+# @package _global_
+# High learning rate experiment
+
+optim:
+  lr_E: 1e8
+  lr_nu: 0.1
+  num_iters: 100
+
+output:
+  plot: true
+  no_show: true

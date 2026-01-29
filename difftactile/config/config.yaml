@@ -1,0 +1,37 @@
+# Default configuration for FEM Parameter Identification
+params:
+  # Ground truth (for synthetic experiments)
+  E_gt: 8000.0      # 0.8e4 Pa
+  nu_gt: 0.43
+
+  # Initial values (to be optimized)
+  E_init: 9000.0   # 1.6e4 + 10
+  nu_init: 0.3      # Valid starting point
+
+optim:
+  lr_E: 100.0       # 1e2
+  lr_nu: 0.0001     # 1e-4
+  num_iters: 25
+
+sim:
+  total_steps: 100
+  sub_steps: 50
+  dt: 0.00005       # 5e-5
+
+output:
+  print_every: 5
+  plot: true
+  no_show: true
+  save_dir: fem_param_identification_results
+
+debug:
+  enabled: false
+  visualize: false
+  grad_check: false
+  use_tape: false
+
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
