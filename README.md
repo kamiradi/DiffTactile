@@ -59,6 +59,7 @@ pip install -r requirements.txt -e .
 conda create -n difftactile python=3.9.16
 conda activate difftactile
 pip install -r requirements.txt -e .
+pip install hydra-config --upgrade
 ```
 
 ## Usage on WSL
