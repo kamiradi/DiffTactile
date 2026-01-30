@@ -655,34 +655,44 @@ class SensorParamEstimation:
         )
 
         # Intialize the sensor and object in the simulation
+        # Also contructs sensor trajectory
         self.init_scene(self.target_sensor) 
 
-        # simulation for loop
+        # scene simulation loop
         for ts in range(self.total_steps):
             self.set_pos_control(self.target_sensor, ts) # set desired pos/ori from traj
-            self.target_sensor.set_pose_control() # apply pos/ori control
+            self.target_sensor.set_pose_control() # apply desired pos/ori control
             self.target_sensor.set_control_vel(0) # set desired vel at frame=0
             self.target_sensor.set_vel(0) # set computed vel at frame=0
 
             # clears contact forces on sensor and target object
             self.reset_sensor(self.target_sensor) 
 
+            # FEM simulation loop
+            # Advances the simulation by sub_steps-1 steps
             for ss in range(self.sub_steps - 1):
                 self.update_step(self.target_sensor, ss)
 
             # Extract predicted marker displacement
             self.target_sensor.extract_markers(self.sub_steps - 2)
+
+            # Extracts the predicted displacement from initial marker positions
             self.extract_displacement_target(ts)
+
+            # Update contact visualization 
+            # Shows predicted sensor-object interaction
             self.update_pred_visualization()
-            # Update contact visualization (showing predicted sensor-object interaction)
             self.update_contact_visualization(
                 self.target_sensor,
                 f"Predicted Contact (E={self.E_target[None]:.0f}, nu={self.nu_target[None]:.3f})",
             )
 
             # Compute loss for this timestep
+            # aggregates it to total loss as well
             self.compute_loss_at_timestep(ts)
 
+            # cache the state of the target sensor, why?
+            # logic in why_manual_gradients.md
             self.memory_to_cache(self.target_sensor, ts)
 
         logger.debug(f"Forward pass complete. Loss={self.loss[None]:.6f}")

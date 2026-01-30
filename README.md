@@ -66,7 +66,7 @@ To repoduce experiments for parameter sweep
 ```bash
 # from project root
 cd difftactile/tasks
-python fem_param_identification.py +experiment=sweep_lr
+python fem_param_identification.py +experiment=sweep_lr --multirun
 ```
 
 
