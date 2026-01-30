@@ -6,6 +6,7 @@ import os
 import taichi as ti
 import trimesh
 import numpy as np
+from pathlib import Path
 from scipy.spatial.transform import Rotation as R
 import sys
 import math
@@ -52,9 +53,10 @@ class MultiObj:
         ## parameters for object
         self.obj_name = obj_name
         if self.obj_name is not None:
-            data_path = os.path.join("..", "meshes", "objects", self.obj_name)
+            root_dir = Path(__file__).parent.parent
+            data_path = root_dir / "meshes" / "objects" / self.obj_name
             obj_loader = ObjLoader(
-                data_path, particle_density=int(self.particle_density)
+                str(data_path.resolve()), particle_density=int(self.particle_density)
             )
             obj_loader.generate_particles()
             self.n_particles = len(obj_loader.particles)

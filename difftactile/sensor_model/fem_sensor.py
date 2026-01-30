@@ -5,6 +5,7 @@ a class to describe sensor elastomer with FEM
 import taichi as ti
 import torch
 import cv2
+from pathlib import Path
 from math import pi
 import numpy as np
 from scipy.spatial import Delaunay
@@ -172,7 +173,8 @@ class FEMDomeSensor:
 
     def init_cam_model(self, init_img_path=None):
         if init_img_path is None:
-            init_img = cv2.imread("./init.png")
+            img_path = Path(__file__).parent / "init.png"
+            init_img = cv2.imread(str(img_path.resolve()))
         else:
             init_img = cv2.imread(init_img_path)
         initial_markers = get_marker_image(init_img)
