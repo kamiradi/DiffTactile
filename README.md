@@ -62,6 +62,16 @@ pip install -r requirements.txt -e .
 pip install hydra-config --upgrade
 ```
 
+## Usage on WSL
+
+If you are using WSL with an NVIDIA GPU, Taichi may fail to find CUDA and fall back to Vulkan, which can cause runtime errors. Make sure the WSL CUDA libraries are visible and force Taichi to use CUDA:
+
+```bash
+export LD_LIBRARY_PATH=/usr/lib/wsl/lib:$LD_LIBRARY_PATH # make libcuda.so visible to the dynamic loader
+export TI_ARCH=cuda # force taichi to use CUDA 
+python box_open.py --use_state --use_tactile
+```
+
 ## Experiments
 To repoduce experiments for parameter sweep
 ```bash
