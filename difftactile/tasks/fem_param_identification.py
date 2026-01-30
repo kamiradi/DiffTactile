@@ -21,6 +21,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from difftactile.sensor_model.fem_sensor import FEMDomeSensor
 from difftactile.object_model.rigid_dynamic import RigidObj
+from difftactile.optim import TaichiAdamOptimizer
 
 TI_TYPE = ti.f32
 NP_TYPE = np.float32
@@ -994,15 +995,28 @@ def run_experiment(cfg: DictConfig):
         f"\nTarget sensor initialized: E={estimator.E_target[None]:.1f}, nu={estimator.nu_target[None]:.4f}"
     )
 
-    # Learning rates (from config)
-    lr_E = cfg.optim.lr_E
-    lr_nu = cfg.optim.lr_nu
-
     # History
     history = {"loss": [], "E": [], "nu": [], "grad_E": [], "grad_nu": []}
 
+    # Optimizer selection (default to sgd for backward compatibility)
+    optimizer_type = cfg.optim.get("type", "sgd")
     autodiff_method = "tape" if cfg.debug.use_tape else "manual"
-    print(f"\nStarting optimization (lr_E={lr_E}, lr_nu={lr_nu}, autodiff={autodiff_method})")
+
+    if optimizer_type == "adam":
+        # Adam optimizer with reparameterization
+        lr = cfg.optim.get("lr", 0.01)
+        betas = tuple(cfg.optim.get("betas", [0.9, 0.999]))
+        adam_optimizer = TaichiAdamOptimizer(
+            E_init=E_init, nu_init=nu_init, lr=lr, betas=betas
+        )
+        print(f"\nStarting optimization (optimizer=Adam, lr={lr}, autodiff={autodiff_method})")
+    else:
+        # Manual SGD (original behavior)
+        lr_E = cfg.optim.lr_E
+        lr_nu = cfg.optim.lr_nu
+        adam_optimizer = None
+        print(f"\nStarting optimization (optimizer=SGD, lr_E={lr_E}, lr_nu={lr_nu}, autodiff={autodiff_method})")
+
     print("-" * 60)
 
     for opt_iter in range(cfg.optim.num_iters):
@@ -1029,32 +1043,45 @@ def run_experiment(cfg: DictConfig):
                 f"         | grad_mu: {result['grad_mu']:.6e} | grad_lam: {result['grad_lam']:.6e}"
             )
 
-        # Check for NaN before gradient descent
-        grad_E_nan = np.isnan(result["grad_E"])
-        grad_nu_nan = np.isnan(result["grad_nu"])
+        if optimizer_type == "adam":
+            # Adam with reparameterization (NaN handling is internal)
+            success = adam_optimizer.step(result["grad_E"], result["grad_nu"])
+            if not success:
+                logger.error(f"Iter {opt_iter}: Adam step skipped due to NaN gradients")
+                continue
 
-        if grad_E_nan or grad_nu_nan:
-            logger.error(
-                f"Iter {opt_iter}: Skipping gradient update due to NaN gradients"
+            # Get updated physical params and apply to estimator
+            new_E, new_nu = adam_optimizer.get_physical_params()
+            logger.debug(
+                f"Adam step: E {result['E']:.1f} -> {new_E:.1f}, nu {result['nu']:.4f} -> {new_nu:.4f}"
             )
-            logger.error(f"  grad_E={result['grad_E']}, grad_nu={result['grad_nu']}")
-            logger.error(f"  Current params: E={result['E']}, nu={result['nu']}")
-            logger.error(f"  Loss={result['loss']}")
-            continue
+            estimator.set_target_params(new_E, new_nu)
+        else:
+            # Manual SGD (original behavior)
+            grad_E_nan = np.isnan(result["grad_E"])
+            grad_nu_nan = np.isnan(result["grad_nu"])
 
-        # Gradient descent
-        new_E = estimator.E_target[None] - lr_E * result["grad_E"]
-        new_nu = estimator.nu_target[None] - lr_nu * result["grad_nu"]
+            if grad_E_nan or grad_nu_nan:
+                logger.error(
+                    f"Iter {opt_iter}: Skipping gradient update due to NaN gradients"
+                )
+                logger.error(f"  grad_E={result['grad_E']}, grad_nu={result['grad_nu']}")
+                logger.error(f"  Current params: E={result['E']}, nu={result['nu']}")
+                logger.error(f"  Loss={result['loss']}")
+                continue
 
-        # Clamp to valid ranges
-        new_E = max(new_E, 100.0)
-        new_nu = max(min(new_nu, 0.49), 0.01)
+            new_E = estimator.E_target[None] - lr_E * result["grad_E"]
+            new_nu = estimator.nu_target[None] - lr_nu * result["grad_nu"]
 
-        logger.debug(
-            f"Gradient descent: E {result['E']:.1f} -> {new_E:.1f}, nu {result['nu']:.4f} -> {new_nu:.4f}"
-        )
+            # Clamp to valid ranges
+            new_E = max(new_E, 100.0)
+            new_nu = max(min(new_nu, 0.49), 0.01)
 
-        estimator.set_target_params(new_E, new_nu)
+            logger.debug(
+                f"SGD step: E {result['E']:.1f} -> {new_E:.1f}, nu {result['nu']:.4f} -> {new_nu:.4f}"
+            )
+
+            estimator.set_target_params(new_E, new_nu)
 
     # Final results
     print("\n" + "=" * 60)
