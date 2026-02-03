@@ -1,0 +1,13 @@
+# @package _global_
+# Experiment config with Adam optimizer defaults
+# Usage: python fem_param_identification.py +experiment=adam
+
+optim:
+  type: "adam"
+  lr: 0.01              # Adam learning rate
+  betas: [0.9, 0.999]   # Adam momentum coefficients (beta1, beta2)
+  num_iters: 10        # More iterations since Adam converges differently than SGD
+
+output:
+  plot: true
+  no_show: true

@@ -15,6 +15,7 @@ multirun/
 assets/
 data/
 fp/
+wandb/
 
 # C extensions
 *.so

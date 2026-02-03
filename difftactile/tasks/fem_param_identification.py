@@ -12,8 +12,22 @@ Setup:
 import taichi as ti
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_agg import FigureCanvasAgg
 import os
 import logging
+import tempfile
+
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+
+try:
+    import imageio
+    IMAGEIO_AVAILABLE = True
+except ImportError:
+    IMAGEIO_AVAILABLE = False
 
 import hydra
 from hydra.core.hydra_config import HydraConfig
@@ -31,6 +45,113 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Module-level logger
 logger = logging.getLogger(__name__)
+
+
+def create_marker_image(init_markers, cur_markers, title=None, color='yellow', figsize=(10, 8)):
+    """Create a matplotlib figure showing marker displacements.
+
+    Mirrors the draw_markers GUI visualization but returns a saveable figure.
+
+    Args:
+        init_markers: Initial marker positions (N, 2)
+        cur_markers: Current marker positions (N, 2)
+        title: Optional title for the plot
+        color: 'green' for observations, 'yellow' for predictions
+        figsize: Figure size tuple (width, height) in inches
+
+    Returns:
+        matplotlib Figure object
+    """
+    img_height = 480
+    img_width = 640
+    scale = img_width
+    rescale = 1.8
+
+    # Transform to normalized coordinates (same as draw_markers)
+    draw_points = rescale * (init_markers - np.array([320, 240])) / scale + np.array([0.5, 0.5])
+    offset = rescale * (cur_markers - init_markers) / scale
+
+    # Color schemes
+    if color == 'green':
+        marker_color = '#00FF00'
+        arrow_color = '#90EE90'  # Light green
+    else:  # yellow (default for predictions)
+        marker_color = '#FFD700'
+        arrow_color = '#E6C949'
+
+    fig, ax = plt.subplots(figsize=figsize)
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.set_aspect('equal')
+    ax.set_facecolor('black')
+
+    # Draw markers as circles (larger for bigger figure)
+    marker_size = 20 * (figsize[0] / 6.4)
+    ax.scatter(draw_points[:, 0], draw_points[:, 1], c=marker_color, s=marker_size, zorder=2)
+
+    # Draw displacement arrows (scale 10x like GUI)
+    arrow_width = 0.004 * (figsize[0] / 6.4)
+    ax.quiver(draw_points[:, 0], draw_points[:, 1],
+              10.0 * offset[:, 0], 10.0 * offset[:, 1],
+              color=arrow_color, scale=1, scale_units='xy', angles='xy', width=arrow_width, zorder=3)
+
+    if title:
+        ax.set_title(title, color='white', fontsize=14 * (figsize[0] / 6.4))
+
+    ax.set_xticks([])
+    ax.set_yticks([])
+    fig.patch.set_facecolor('black')
+    plt.tight_layout()
+
+    return fig
+
+
+def create_marker_gif(init_markers, displacements, title_prefix="", color='yellow',
+                      figsize=(5, 4), fps=10, output_path=None):
+    """Create a GIF showing marker displacements evolving over time.
+
+    Args:
+        init_markers: Initial marker positions (N, 2)
+        displacements: Displacement at each timestep (T, N, 2)
+        title_prefix: Prefix for frame titles
+        color: 'green' for observations, 'yellow' for predictions
+        figsize: Figure size tuple (width, height) in inches
+        fps: Frames per second for the GIF
+        output_path: Path to save GIF. If None, uses a temp file.
+
+    Returns:
+        Path to the created GIF file
+    """
+    if not IMAGEIO_AVAILABLE:
+        logger.warning("imageio not installed, cannot create GIF")
+        return None
+
+    frames = []
+    num_timesteps = displacements.shape[0]
+
+    for t in range(num_timesteps):
+        cur_markers = init_markers + displacements[t]
+        title = f"{title_prefix} (t={t}/{num_timesteps-1})" if title_prefix else f"t={t}/{num_timesteps-1}"
+
+        fig = create_marker_image(init_markers, cur_markers, title=title, color=color, figsize=figsize)
+
+        # Convert figure to RGB array
+        canvas = FigureCanvasAgg(fig)
+        canvas.draw()
+        buf = canvas.buffer_rgba()
+        frame = np.asarray(buf)[:, :, :3]  # Remove alpha channel
+        frames.append(frame)
+        plt.close(fig)
+
+    # Save GIF
+    if output_path is None:
+        fd, output_path = tempfile.mkstemp(suffix='.gif')
+        os.close(fd)
+
+    # Convert fps to duration in ms (newer imageio API)
+    duration_ms = 1000 / fps
+    imageio.mimsave(output_path, frames, duration=duration_ms, loop=0)
+    return output_path
 
 
 @ti.data_oriented
@@ -958,6 +1079,22 @@ def run_experiment(cfg: DictConfig):
     if cfg.debug.enabled:
         logger.info("Debug mode enabled - verbose logging active")
 
+    # Initialize wandb
+    wandb_run = None
+    if cfg.get("wandb", {}).get("enabled", False):
+        if not WANDB_AVAILABLE:
+            logger.warning("wandb not installed, skipping tracking")
+        else:
+            wandb_run = wandb.init(
+                project=cfg.wandb.get("project", "difftactile-fem"),
+                entity=cfg.wandb.get("entity"),
+                name=cfg.wandb.get("name"),
+                tags=cfg.wandb.get("tags", []),
+                notes=cfg.wandb.get("notes"),
+                config=OmegaConf.to_container(cfg, resolve=True),
+            )
+            logger.info(f"wandb run initialized: {wandb_run.url}")
+
     ti.init(arch=ti.gpu, device_memory_GB=4)
 
     # Ground truth parameters (from config)
@@ -1042,6 +1179,59 @@ def run_experiment(cfg: DictConfig):
             print(
                 f"         | grad_mu: {result['grad_mu']:.6e} | grad_lam: {result['grad_lam']:.6e}"
             )
+
+        # Log to wandb
+        if wandb_run:
+            log_dict = {
+                "iter": opt_iter,
+                "loss": result["loss"],
+                "E": result["E"],
+                "nu": result["nu"],
+                "grad_E": result["grad_E"],
+                "grad_nu": result["grad_nu"],
+                "E_error_pct": abs(result["E"] - E_gt) / E_gt * 100,
+                "nu_error_pct": abs(result["nu"] - nu_gt) / nu_gt * 100,
+            }
+
+            # Log marker GIFs every 5th iteration
+            if opt_iter % 5 == 0 and IMAGEIO_AVAILABLE:
+                # Get initial marker positions
+                init_markers = estimator.source_sensor.virtual_markers.to_numpy()
+
+                # Use Hydra output directory for GIFs
+                output_dir = HydraConfig.get().runtime.output_dir
+
+                # Observation (GT) markers GIF - green
+                obs_displacements = estimator.observed_displacement.to_numpy()
+                obs_gif_path = os.path.join(output_dir, f"observation_iter{opt_iter:03d}.gif")
+                obs_gif_path = create_marker_gif(
+                    init_markers,
+                    obs_displacements,
+                    title_prefix="Observation (GT)",
+                    color='green',
+                    figsize=(10, 8),
+                    fps=15,
+                    output_path=obs_gif_path
+                )
+                if obs_gif_path:
+                    log_dict["observation_markers"] = wandb.Video(obs_gif_path, format="gif")
+
+                # Predicted markers GIF - yellow
+                pred_displacements = estimator.predicted_displacement.to_numpy()
+                pred_gif_path = os.path.join(output_dir, f"prediction_iter{opt_iter:03d}.gif")
+                pred_gif_path = create_marker_gif(
+                    init_markers,
+                    pred_displacements,
+                    title_prefix=f"Prediction (E={result['E']:.0f}, nu={result['nu']:.3f})",
+                    color='yellow',
+                    figsize=(10, 8),
+                    fps=15,
+                    output_path=pred_gif_path
+                )
+                if pred_gif_path:
+                    log_dict["predicted_markers"] = wandb.Video(pred_gif_path, format="gif")
+
+            wandb.log(log_dict)
 
         if optimizer_type == "adam":
             # Adam with reparameterization (NaN handling is internal)
@@ -1154,8 +1344,21 @@ def run_experiment(cfg: DictConfig):
         plt.savefig(plot_path, dpi=150)
         print(f"\nPlot saved to {plot_path}")
 
+        # Log plot to wandb
+        if wandb_run:
+            wandb.log({"convergence_plot": wandb.Image(plot_path)})
+
         if not cfg.output.no_show:
             plt.show()
+
+    # Log final summary to wandb
+    if wandb_run:
+        wandb.summary["final_E"] = float(estimator.E_target[None])
+        wandb.summary["final_nu"] = float(estimator.nu_target[None])
+        wandb.summary["final_E_error_pct"] = abs(estimator.E_target[None] - E_gt) / E_gt * 100
+        wandb.summary["final_nu_error_pct"] = abs(estimator.nu_target[None] - nu_gt) / nu_gt * 100
+        wandb.summary["final_loss"] = history["loss"][-1] if history["loss"] else None
+        wandb.finish()
 
 
 if __name__ == "__main__":

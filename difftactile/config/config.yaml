@@ -19,7 +19,7 @@ optim:
   num_iters: 25
 
 sim:
-  total_steps: 100
+  total_steps: 200
   sub_steps: 50
   dt: 0.00005       # 5e-5
 
@@ -30,10 +30,18 @@ output:
   save_dir: fem_param_identification_results
 
 debug:
-  enabled: false
+  enabled: False
   visualize: false
-  grad_check: false
+  grad_check: False
   use_tape: false
+
+wandb:
+  enabled: true
+  project: "difftactile-fem"
+  entity: "adityakamireddypalli-university-of-edinburgh"  # your wandb username/team, or null for default
+  name: test    # run name, null for auto-generated
+  tags: []      # optional tags like ["baseline", "adam"]
+  notes: null   # optional notes for this run
 
 hydra:
   run:

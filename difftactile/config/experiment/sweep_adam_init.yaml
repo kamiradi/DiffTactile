@@ -1,0 +1,28 @@
+# @package _global_
+# Sweep over E_init and nu_init with Adam optimizer
+# Usage: python fem_param_identification.py +experiment=sweep_adam_init --multirun
+
+defaults:
+  - override /hydra/sweeper: basic
+
+hydra:
+  sweeper:
+    params:
+      params.E_init: 5000,6000,7000,8000,9000,10000,11000,12000,13000,14000
+      params.nu_init: 0.20,0.25,0.30,0.35,0.40,0.45
+
+optim:
+  type: "adam"
+  lr: 0.01
+  betas: [0.9, 0.999]
+  num_iters: 150
+
+wandb:
+  enabled: true
+  project: "difftactile-fem"
+  name: "E${params.E_init}_nu${params.nu_init}"
+  tags: ["sweep", "adam", "init_params"]
+
+output:
+  plot: true
+  no_show: true
